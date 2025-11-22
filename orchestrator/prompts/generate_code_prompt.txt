@@ -1,0 +1,75 @@
+You are generating Python code for a Temporal workflow system.
+
+USER INSTRUCTION:
+{user_instruction}
+
+AVAILABLE MCP TOOLS:
+{tools}
+
+REQUIREMENTS:
+1. Generate TWO separate Python files with clear markers
+2. Use Temporal Python SDK (temporalio package)
+3. Follow best practices for Temporal workflows
+
+OUTPUT FORMAT:
+Generate code in this exact format:
+
+### ACTIVITIES_START ###
+[Put all activities.py code here]
+### ACTIVITIES_END ###
+
+### WORKFLOW_START ###
+[Put all workflow.py code here]
+### WORKFLOW_END ###
+
+ACTIVITIES.PY REQUIREMENTS:
+- Import: from temporalio import activity
+- Create one activity function per MCP tool used
+- Use @activity.defn decorator
+- Each activity should call the corresponding MCP tool
+- Include proper error handling
+- Add type hints
+
+WORKFLOW.PY REQUIREMENTS:
+- Import: from temporalio import workflow
+- Import: from datetime import timedelta
+- Import your activities
+- Create a workflow class with @workflow.defn decorator
+- Define @workflow.run method
+- Call activities using workflow.execute_activity()
+- Set proper timeouts (start_to_close_timeout=timedelta(minutes=5))
+- Return final result
+- Add proper error handling
+
+EXAMPLE STRUCTURE:
+
+### ACTIVITIES_START ###
+from temporalio import activity
+from typing import Any
+
+@activity.defn
+async def send_email_activity(to: str, subject: str, body: str) -> dict:
+    # Call MCP tool
+    result = send_email(to, subject, body)
+    return result
+### ACTIVITIES_END ###
+
+### WORKFLOW_START ###
+from temporalio import workflow
+from datetime import timedelta
+from . import activities
+
+@workflow.defn
+class OrderProcessingWorkflow:
+    @workflow.run
+    async def run(self, order_id: str) -> dict:
+        # Execute activities
+        order = await workflow.execute_activity(
+            activities.fetch_order_activity,
+            order_id,
+            start_to_close_timeout=timedelta(minutes=5)
+        )
+        return order
+### WORKFLOW_END ###
+
+Now generate the code based on the user instruction above.
