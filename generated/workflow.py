@@ -1,69 +1,44 @@
 from temporalio import workflow
 from datetime import timedelta
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List, Optional
 from . import activities
 
-# -----------------------------
-# Dataclasses for workflow IO
-# -----------------------------
 @dataclass
-class OrderInput:
+class PaymentWorkflowInput:
     order_id: str
-    customer_email: str
+    customer_email: Optional[str] = None
+    items: Optional[List[Dict]] = None
 
-
-@dataclass
-class OrderResult:
-    order_id: str
-    status: str
-
-
-# -----------------------------
-# Workflow Definition
-# -----------------------------
 @workflow.defn
-class OrderProcessingWorkflow:
-
+class PaymentWorkflow:
     @workflow.run
-    async def run(self, order: OrderInput) -> OrderResult:
-        """
-        Main workflow to process an order.
-        Steps:
-        1. Fetch order data.
-        2. Send confirmation email.
-        3. Save confirmation status in DB.
-        """
-
+    async def run(self, input: PaymentWorkflowInput) -> Dict:
         try:
-            # 1️⃣ Fetch order info
-            fetched_order = await workflow.execute_activity(
-                activities.fetch_order_activity,
-                order.order_id,
-                start_to_close_timeout=timedelta(minutes=5),
+            result1 = await workflow.execute_activity(
+                activities.activity1,
+                input.order_id,
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=workflow.RetryPolicy(
+                    maximum_attempts=1,
+                    backoff_coefficient=1,
+                    initial_interval=timedelta(seconds=10),
+                    maximum_interval=timedelta(seconds=10),
+                    maximum_backoff_interval=timedelta(seconds=10),
+                ),
             )
-
-            # 2️⃣ Send confirmation email
-            await workflow.execute_activity(
-                activities.send_email_activity,
-                order.customer_email,
-                "Order Confirmation",
-                f"Your order {order.order_id} has been confirmed.",
-                start_to_close_timeout=timedelta(minutes=5),
+            result2 = await workflow.execute_activity(
+                activities.activity2,
+                input.order_id,
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=workflow.RetryPolicy(
+                    maximum_attempts=1,
+                    backoff_coefficient=1,
+                    initial_interval=timedelta(seconds=10),
+                    maximum_interval=timedelta(seconds=10),
+                    maximum_backoff_interval=timedelta(seconds=10),
+                ),
             )
-
-            # 3️⃣ Save new order status
-            await workflow.execute_activity(
-                activities.save_to_db_activity,
-                "orders",
-                {"order_id": order.order_id, "status": "confirmed"},
-                start_to_close_timeout=timedelta(minutes=5),
-            )
-
-            # 4️⃣ Final structured result
-            return OrderResult(order_id=order.order_id, status="confirmed")
-
+            return {"status": "ok", "data": {"activity1": result1, "activity2": result2}}
         except Exception as e:
-            raise workflow.ApplicationError(
-                f"Failed to process order: {str(e)}"
-            )
+            raise workflow.ApplicationError(str(e))

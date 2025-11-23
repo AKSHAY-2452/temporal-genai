@@ -1,4 +1,4 @@
-You are generating Python code for a Temporal workflow system.
+You are generating Python code for a Temporal Workflow System.
 
 USER INSTRUCTION:
 {user_instruction}
@@ -6,10 +6,28 @@ USER INSTRUCTION:
 AVAILABLE MCP TOOLS:
 {tools}
 
-REQUIREMENTS:
-1. Generate TWO separate Python files with clear markers
-2. Use Temporal Python SDK (temporalio package)
-3. Follow best practices for Temporal workflows
+IMPORTANT — DO NOT BREAK THESE RULES:
+1. All workflow inputs MUST be dataclasses.
+2. Workflows MUST NOT accept primitive types (str, dict, int).
+3. Activities MAY use primitives and dicts.
+4. Workflows MUST use dataclass fields, NEVER dictionary keys.
+5. All generated code MUST be syntactically correct, runnable, import-complete, and consistent.
+
+When generating Python dataclasses for Temporal workflow inputs:
+
+1. All fields EXCEPT the primary identifier must be OPTIONAL.
+2. Use typing.Optional for all optional fields.
+3. Default value for optional fields must be = None.
+4. Example format:
+
+from dataclasses import dataclass
+from typing import Optional, List, Dict
+
+@dataclass
+class WorkflowInput:
+    order_id: str                                  # required
+    customer_email: Optional[str] = None           # optional
+    items: Optional[List[Dict]] = None             # optional
 
 OUTPUT FORMAT:
 Generate code in this exact format:
@@ -22,54 +40,91 @@ Generate code in this exact format:
 [Put all workflow.py code here]
 ### WORKFLOW_END ###
 
+===============================================================
 ACTIVITIES.PY REQUIREMENTS:
-- Import: from temporalio import activity
-- Create one activity function per MCP tool used
-- Use @activity.defn decorator
-- Each activity should call the corresponding MCP tool
-- Include proper error handling
-- Add type hints
+===============================================================
+- Imports:
+    from temporalio import activity
+    from typing import Any, Dict, List, Optional
+- One activity function per MCP tool used
+- Decorate each activity with @activity.defn
+- Activities MUST have type hints
+- Include try/except for error handling
+- Activities MAY accept dicts, primitives, lists
+- Activities MUST NOT import workflow code
 
-WORKFLOW.PY REQUIREMENTS:
-- Import: from temporalio import workflow
-- Import: from datetime import timedelta
-- Import your activities
-- Create a workflow class with @workflow.defn decorator
-- Define @workflow.run method
-- Call activities using workflow.execute_activity()
-- Set proper timeouts (start_to_close_timeout=timedelta(minutes=5))
-- Return final result
-- Add proper error handling
-
-EXAMPLE STRUCTURE:
-
-### ACTIVITIES_START ###
-from temporalio import activity
-from typing import Any
+Example pattern:
 
 @activity.defn
-async def send_email_activity(to: str, subject: str, body: str) -> dict:
-    # Call MCP tool
-    result = send_email(to, subject, body)
-    return result
-### ACTIVITIES_END ###
+async def fetch_order_activity(order_id: str) -> Dict:
+    try:
+        return fetch_order_tool(order_id)
+    except Exception as e:
+        raise RuntimeError(f"Activity failed: {{e}}")
 
-### WORKFLOW_START ###
-from temporalio import workflow
-from datetime import timedelta
-from . import activities
+@activity.defn
+async def send_email_activity(to: str, subject: str, body: str) -> Dict:
+    try:
+        return send_email_tool(to, subject, body)
+    except Exception as e:
+        raise RuntimeError(f"Activity failed: {{e}}")
+
+===============================================================
+WORKFLOW.PY REQUIREMENTS:
+===============================================================
+- Imports:
+    from temporalio import workflow
+    from datetime import timedelta
+    from dataclasses import dataclass
+    from typing import Dict, List, Optional
+    from . import activities
+- Define an input dataclass, e.g.:
+
+@dataclass
+class WorkflowInput:
+    order_id: str
+    customer_email: Optional[str] = None
+    items: Optional[List[Dict]] = None
+
+- Create a workflow class with @workflow.defn
+- Define @workflow.run(self, input: WorkflowInput)
+- Use workflow.execute_activity() to run activities
+- MUST specify start_to_close_timeout=timedelta(minutes=5)
+- Return final result as a dataclass or dict
+- MUST wrap the workflow body in try/except
+
+Example pattern:
 
 @workflow.defn
 class OrderProcessingWorkflow:
     @workflow.run
-    async def run(self, order_id: str) -> dict:
-        # Execute activities
-        order = await workflow.execute_activity(
-            activities.fetch_order_activity,
-            order_id,
-            start_to_close_timeout=timedelta(minutes=5)
-        )
-        return order
-### WORKFLOW_END ###
+    async def run(self, input: WorkflowInput) -> Dict:
+        try:
+            result = await workflow.execute_activity(
+                activities.fetch_order_activity,
+                input.order_id,
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+            return {{"status": "ok", "data": result}}
+        except Exception as e:
+            raise workflow.ApplicationError(str(e))
 
-Now generate the code based on the user instruction above.
+===============================================================
+STYLE GUIDELINES:
+===============================================================
+- Use snake_case for all variables and parameters.
+- Use dataclasses ONLY for workflow inputs and outputs.
+- Never assume missing imports — include everything required.
+- Never reference undefined functions.
+- Never generate conflicting types across workflow and activities.
+- All code must be valid as-is, without modification.
+
+The output MUST follow the exact markers:
+
+### ACTIVITIES_START ###
+... activities code ...
+### ACTIVITIES_END ###
+
+### WORKFLOW_START ###
+... workflow code ...
+### WORKFLOW_END ###
