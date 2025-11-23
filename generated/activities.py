@@ -2,19 +2,27 @@ from temporalio import activity
 from typing import Any, Dict, List, Optional
 
 @activity.defn
-async def activity1(order_id: str) -> Dict:
+async def charge_card_activity(amount: float) -> Dict:
     try:
-        # Since the problem doesn't specify what activity1 should do, 
-        # we'll use the fetch_order tool as an example
-        return {"activity1": "success"}
+        # Simulating a card charge activity
+        return {"status": "charged", "amount": amount}
     except Exception as e:
         raise RuntimeError(f"Activity failed: {e}")
 
 @activity.defn
-async def activity2(order_id: str) -> Dict:
+async def send_email_activity(to: str, subject: str, body: str) -> Dict:
     try:
-        # Since the problem doesn't specify what activity2 should do, 
-        # we'll use the fetch_order tool as an example
-        return {"activity2": "success"}
+        # Simulating an email send activity
+        return {"status": "sent", "to": to, "subject": subject, "body": body}
+    except Exception as e:
+        raise RuntimeError(f"Activity failed: {e}")
+
+@activity.defn
+async def wait_activity(duration: int) -> Dict:
+    try:
+        # Simulating a wait activity
+        import time
+        time.sleep(duration * 3600)  # Convert hours to seconds
+        return {"status": "waited", "duration": duration}
     except Exception as e:
         raise RuntimeError(f"Activity failed: {e}")

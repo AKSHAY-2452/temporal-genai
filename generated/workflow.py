@@ -5,40 +5,39 @@ from typing import Dict, List, Optional
 from . import activities
 
 @dataclass
-class PaymentWorkflowInput:
+class OrderProcessorInput:
     order_id: str
     customer_email: Optional[str] = None
     items: Optional[List[Dict]] = None
 
 @workflow.defn
-class PaymentWorkflow:
+class OrderProcessor:
     @workflow.run
-    async def run(self, input: PaymentWorkflowInput) -> Dict:
+    async def run(self, input: OrderProcessorInput) -> Dict:
         try:
-            result1 = await workflow.execute_activity(
-                activities.activity1,
-                input.order_id,
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=workflow.RetryPolicy(
-                    maximum_attempts=1,
-                    backoff_coefficient=1,
-                    initial_interval=timedelta(seconds=10),
-                    maximum_interval=timedelta(seconds=10),
-                    maximum_backoff_interval=timedelta(seconds=10),
-                ),
+            # Charge the card
+            charge_result = await workflow.execute_activity(
+                activities.charge_card_activity,
+                100.0,  # Hardcoded amount for demonstration
+                start_to_close_timeout=timedelta(minutes=5),
             )
-            result2 = await workflow.execute_activity(
-                activities.activity2,
-                input.order_id,
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=workflow.RetryPolicy(
-                    maximum_attempts=1,
-                    backoff_coefficient=1,
-                    initial_interval=timedelta(seconds=10),
-                    maximum_interval=timedelta(seconds=10),
-                    maximum_backoff_interval=timedelta(seconds=10),
-                ),
+            
+            # Send an email
+            email_result = await workflow.execute_activity(
+                activities.send_email_activity,
+                input.customer_email if input.customer_email else "default@example.com",
+                "Order Confirmation",
+                "Your order has been processed.",
+                start_to_close_timeout=timedelta(minutes=5),
             )
-            return {"status": "ok", "data": {"activity1": result1, "activity2": result2}}
+            
+            # Wait for 1 hour
+            wait_result = await workflow.execute_activity(
+                activities.wait_activity,
+                1,  # Wait for 1 hour
+                start_to_close_timeout=timedelta(hours=1),
+            )
+            
+            return {"status": "ok", "charge_result": charge_result, "email_result": email_result, "wait_result": wait_result}
         except Exception as e:
             raise workflow.ApplicationError(str(e))
